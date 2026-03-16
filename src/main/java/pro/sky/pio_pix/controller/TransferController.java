@@ -30,7 +30,7 @@ public class TransferController {
 
     Logger logger = LoggerFactory.getLogger(UserController.class);
 
-    @Operation(summary = "Выполнить перевод средств на счет получателя",
+    @Operation(summary = "Получить информацию о выполненных переводах средств",
             tags = "Трансфер",
             responses = {
                     @ApiResponse(
