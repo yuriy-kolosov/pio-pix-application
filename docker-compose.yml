@@ -1,0 +1,86 @@
+#version: '3.8'
+
+services:
+  db:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=pio-pix
+      - POSTGRES_USER=pio_user
+      - POSTGRES_PASSWORD=pio_user
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U pio_user -d pio-pix" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
+      - 5432:5432
+    #  volumes:
+    #    - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_USER=${REDIS_USER}
+      - REDIS_USER_PASSWORD=${REDIS_USER_PASSWORD}
+    hostname: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+  pio-pix:
+    build:
+      context: .
+    container_name: pio_pix_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/pio-pix
+      - SPRING_DATASOURCE_USERNAME=pio_user
+      - SPRING_DATASOURCE_PASSWORD=pio_user
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+      - SPRING_LIQUIBASE_CHANGE_LOG=classpath:liquibase/changelog-master.yml
+    ports:
+      - 9090:9090
+    networks:
+      - backend
+
+  auth:
+    build:
+      context: ..\pio-pix-auth-server
+    container_name: pio_pix_auth_server
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pio-pix:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/pio-pix
+      - SPRING_DATASOURCE_USERNAME=pio_user
+      - SPRING_DATASOURCE_PASSWORD=pio_user
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    ports:
+      - 8080:8080
+    networks:
+      - backend
+
+#volumes:
+#  postgres_data:
+
+networks:
+  backend:
+    driver: bridge
